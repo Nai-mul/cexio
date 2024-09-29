@@ -15,25 +15,19 @@ from bot.utils.version_updater import parser as ps
 
 start_text = """
 
+
 ███████╗██╗███████╗     ██████╗ ██████╗ ██████╗ ███████╗██████╗ 
 ██╔════╝██║╚══███╔╝    ██╔════╝██╔═══██╗██╔══██╗██╔════╝██╔══██╗
 ███████╗██║  ███╔╝     ██║     ██║   ██║██║  ██║█████╗  ██████╔╝
-╚════██║██║ ███╔╝      ██║     ██║   ██║██║  ██║██╔══╝  ██╔══██╗
+╚════██║██║ ███╔╝      ██║     ██║   ██║██╔══╝  ██╔══██╗
 ███████║██║███████╗    ╚██████╗╚██████╔╝██████╔╝███████╗██║  ██║
 ╚══════╝╚═╝╚══════╝     ╚═════╝ ╚═════╝ ╚═════╝ ╚══════╝╚═╝  ╚═╝
 
 CEX.IO BOT V 2.3
 Prepared and Developed by: F.Davoodi                                                                                                    
-
-Select an action:
-
-    1. Run clicker
-    2. Create session
 """
 
 global tg_clients
-
-
 
 
 def get_session_names() -> list[str]:
@@ -41,7 +35,6 @@ def get_session_names() -> list[str]:
     session_names = [
         os.path.splitext(os.path.basename(file))[0] for file in session_names
     ]
-
     return session_names
 
 
@@ -51,7 +44,6 @@ def get_proxies() -> list[Proxy]:
             proxies = [Proxy.from_str(proxy=row.strip()).as_url for row in file]
     else:
         proxies = []
-
     return proxies
 
 
@@ -61,7 +53,7 @@ async def get_tg_clients() -> list[Client]:
     session_names = get_session_names()
 
     if not session_names:
-        raise FileNotFoundError("Not found session files")
+        return None  # No sessions found
 
     if not settings.API_ID or not settings.API_HASH:
         raise ValueError("API_ID and API_HASH not found in the .env file.")
@@ -79,6 +71,7 @@ async def get_tg_clients() -> list[Client]:
 
     return tg_clients
 
+
 async def auto_update_version():
     while True:
         await asyncio.sleep(3600)
@@ -86,33 +79,19 @@ async def auto_update_version():
 
 
 async def process() -> None:
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-a", "--action", type=int, help="Action to perform")
-
     logger.info(f"Detected {len(get_session_names())} sessions | {len(get_proxies())} proxies")
     ps.get_app_version()
 
-    action = parser.parse_args().action
+    tg_clients = await get_tg_clients()
 
-    if not action:
+    if tg_clients is None:
+        # No sessions, prompt to create a session
         print(start_text)
-
-        while True:
-            action = input("> ")
-
-            if not action.isdigit():
-                logger.warning("Action must be number")
-            elif action not in ["1", "2"]:
-                logger.warning("Action must be 1 or 2")
-            else:
-                action = int(action)
-                break
-
-    if action == 2:
+        print("No sessions found. Please create a session first.")
         await register_sessions()
-    elif action == 1:
-        tg_clients = await get_tg_clients()
-
+    else:
+        # Sessions found, automatically run clicker
+        print("Sessions found. Starting clicker...")
         await run_tasks(tg_clients=tg_clients)
 
 
@@ -133,3 +112,7 @@ async def run_tasks(tg_clients: list[Client]):
     ]
     tasks.append(asyncio.create_task(auto_update_version()))
     await asyncio.gather(*tasks)
+
+
+if __name__ == "__main__":
+    asyncio.run(process())
